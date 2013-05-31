@@ -1,40 +1,131 @@
 package com.ecem.ecc;
 
+import java.math.BigInteger;
+import java.util.ArrayList;
+
 public class Protocol {
 
 	// Curves of form y^2 = x^3 + ax + b mod p
 
+	public static final Point inf = new Point(0, 0);
+	public static final BigInteger ONE = BigInteger.ONE, TWO = BigInteger
+			.valueOf(2), THREE = BigInteger.valueOf(3);
+
 	public int a, b, modp;
+	public BigInteger modP;
 
 	public Protocol(int a, int b, int p) {
 		this.a = a;
 		this.b = b;
 		modp = p;
+		modP = BigInteger.valueOf(modp);
+	}
+
+	public int findOrder(Point p) {
+
+		int order = 1;
+		Point result = p;
+
+		while (!result.equals(inf)) {
+			result = addition(p, result);
+			order++;
+		}
+
+		return order;
+	}
+
+	public ArrayList<Point> findAllPoints() {
+
+		ArrayList<Point> results = new ArrayList<Point>();
+
+		int[] roots;
+
+		for (int x = 0; x < modp; x++) {
+			roots = squareRoot(f(x));
+
+			if (roots != null) {
+				results.add(new Point(x, roots[0]));
+
+				if (roots[0] != roots[1])
+					results.add(new Point(x, roots[1]));
+			}
+		}
+		
+		results.add(inf);
+
+		return results;
+	}
+
+	public int f(int x) {
+		return (BigInteger.valueOf(x).modPow(THREE, modP)
+				.intValue()
+				+ BigInteger.valueOf(a).multiply(BigInteger.valueOf(x))
+						.mod(modP).intValue() + b)
+				% modp;
+	}
+
+	// square root a mod p
+	public int[] squareRoot(int y) {
+
+		int x = BigInteger.valueOf(y)
+				.modPow(BigInteger.valueOf((modp + 1) / 4), modP).intValue();
+
+		if ((x * x) % modp == y)
+			return new int[] { x, (modp - x) % modp };
+		else
+			return null;
 	}
 
 	public Point addition(Point p, Point q) {
 
-		int delta;
+		if (p.equals(inf)) {
+			return q;
+		}
+		if (q.equals(inf)) {
+			return p;
+		}
+		if (p.x == q.x && p.y == (-q.y + modp) % modp) {
+			return inf;
+		}
+
+		int lambda;
+		BigInteger l;
 
 		// Addition
 		if (!p.equals(q)) {
 
-			delta = (p.y - q.y + modp) % modp;
-			
-			delta = (modInverse((p.x - q.x + modp) % modp) * delta) % modp;
+			lambda = (p.y - q.y) % modp;
+			if (lambda < 0)
+				lambda += modp;
+
+			l = BigInteger.valueOf(lambda);
+
+			lambda = modInverse(p.x - q.x).multiply(l).mod(modP).intValue();
 
 		} else { // Doubling
 
-			delta = ((3 * p.x * p.x + a) * modInverse(2 * p.y)) % modp;
+			lambda = modInverse(2 * p.y)
+					.multiply(
+							BigInteger.valueOf(p.x).modPow(TWO, modP)
+									.multiply(THREE).add(BigInteger.valueOf(a)))
+					.mod(modP).intValue();
 		}
-		
-		int xr = (delta * delta - (p.x + q.x) + modp) % modp;
-		int yr = (delta * (p.x - xr) - p.y + modp) % modp;
+
+		l = BigInteger.valueOf(lambda);
+
+		int xr = (l.modPow(TWO, modP).intValue() - (p.x + q.x)) % modp;
+		if (xr < 0)
+			xr += modp;
+		int yr = (l.multiply(BigInteger.valueOf(p.x - xr)).mod(modP).intValue() - p.y)
+				% modp;
+		if (yr < 0)
+			yr += modp;
 
 		return new Point(xr, yr);
 	}
 
-	public int modInverse(int a) {
-		return (int) Math.pow(a, modp-2) % modp;
+	public BigInteger modInverse(int a) {
+		return BigInteger.valueOf(a).modInverse(modP);
 	}
+
 }
